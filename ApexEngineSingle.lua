@@ -167,6 +167,35 @@ function Framework:Bootstrap()
     return self
 end
 
+function Framework:SetConfig(section, key, value)
+    if not self.Config[section] then
+        self.Config[section] = {}
+    end
+    self.Config[section][key] = value
+end
+
+function Framework:ToggleModule(name, enabled)
+    local plugin = self.Plugins[name]
+    if not plugin then return false end
+    if enabled then
+        self:EnablePlugin(name)
+    else
+        self:DisablePlugin(name)
+    end
+    return true
+end
+
+function Framework:GetSummary()
+    local summary = {}
+    for name, plugin in pairs(self.Plugins) do
+        summary[name] = {
+            Active = plugin.Active or false,
+            Name = plugin.Name or name,
+        }
+    end
+    return summary
+end
+
 function Framework:Tick(dt)
     for _, plugin in pairs(self.Plugins) do
         if plugin.Active and plugin.Process then
@@ -776,7 +805,14 @@ function StatusUIPlugin:Process(dt)
     if dt and dt > 0 then
         fps = math.max(1, math.floor(1 / dt))
     end
-    body.Text = string.format("Modules: %d\nFPS: %d\nStatus: Active", #self.Framework.Plugins, fps)
+    local summary = self.Framework:GetSummary()
+    local activeCount = 0
+    for _, item in pairs(summary) do
+        if item.Active then
+            activeCount = activeCount + 1
+        end
+    end
+    body.Text = string.format("Modules: %d\nActive: %d\nFPS: %d\nStatus: Active", #summary, activeCount, fps)
 end
 
 local engine = Framework.new()
