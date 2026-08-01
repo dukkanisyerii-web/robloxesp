@@ -6,6 +6,18 @@ local Framework = {}
 Framework.__index = Framework
 Framework.Version = "1.0.0"
 
+local function getLocalPlayer()
+    local player = Players.LocalPlayer
+    if player then
+        return player
+    end
+    local players = Players:GetPlayers()
+    if players and #players > 0 then
+        return players[1]
+    end
+    return nil
+end
+
 function Framework.new()
     local self = setmetatable({
         Name = "ApexEngine",
@@ -121,7 +133,7 @@ function Framework:DisablePlugin(name)
 end
 
 function Framework:Bootstrap()
-    if self.Started then return end
+    if self.Started then return self end
     self.Started = true
 
     self:RegisterPlugin(UtilityPlugin)
@@ -130,6 +142,7 @@ function Framework:Bootstrap()
     self:RegisterPlugin(ResiliencePlugin)
     self:RegisterPlugin(SessionAnalyticsPlugin)
     self:RegisterPlugin(RecoveryCoordinatorPlugin)
+    self:RegisterPlugin(StatusUIPlugin)
 
     self:EnablePlugin("Utility")
     self:EnablePlugin("Diagnostics")
@@ -137,12 +150,21 @@ function Framework:Bootstrap()
     self:EnablePlugin("Resilience")
     self:EnablePlugin("SessionAnalytics")
     self:EnablePlugin("RecoveryCoordinator")
+    self:EnablePlugin("StatusUI")
 
     self.RenderConnection = RunService.RenderStepped:Connect(function(dt)
         self:Tick(dt)
     end)
 
+    if getgenv then
+        getgenv().ApexEngine = self
+        getgenv().ApexEngineBootstrap = function()
+            return self:Bootstrap()
+        end
+    end
+
     print("[ApexEngine] Single-file framework loaded and running.")
+    return self
 end
 
 function Framework:Tick(dt)
@@ -667,4 +689,104 @@ function RecoveryCoordinatorPlugin:AttemptRecovery(state)
     end
 end
 
-return Framework.new()
+local StatusUIPlugin = {}
+StatusUIPlugin.__index = StatusUIPlugin
+
+function StatusUIPlugin.new()
+    return setmetatable({
+        Name = "StatusUI",
+        Active = false,
+        Gui = nil,
+    }, StatusUIPlugin)
+end
+
+function StatusUIPlugin:Init(framework)
+    self.Framework = framework
+    self.Config = framework.Config
+end
+
+function StatusUIPlugin:Start()
+    self.Active = true
+    self:BuildGui()
+end
+
+function StatusUIPlugin:Stop()
+    self.Active = false
+    if self.Gui then
+        self.Gui:Destroy()
+        self.Gui = nil
+    end
+end
+
+function StatusUIPlugin:BuildGui()
+    local player = getLocalPlayer()
+    if not player then return end
+    local playerGui = player:FindFirstChild("PlayerGui")
+    if not playerGui then return end
+    if self.Gui then
+        self.Gui:Destroy()
+    end
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "ApexEngineStatus"
+    gui.ResetOnSpawn = false
+    gui.Parent = playerGui
+
+    local frame = Instance.new("Frame")
+    frame.Name = "MainFrame"
+    frame.Size = UDim2.new(0, 300, 0, 100)
+    frame.Position = UDim2.new(0.02, 0, 0.02, 0)
+    frame.BackgroundColor3 = Color3.fromRGB(15, 20, 30)
+    frame.BorderSizePixel = 0
+    frame.Parent = gui
+
+    local title = Instance.new("TextLabel")
+    title.Name = "Title"
+    title.Size = UDim2.new(1, 0, 0, 28)
+    title.Position = UDim2.new(0, 0, 0, 0)
+    title.BackgroundTransparency = 1
+    title.Text = "ApexEngine Online"
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 18
+    title.Parent = frame
+
+    local body = Instance.new("TextLabel")
+    body.Name = "Body"
+    body.Size = UDim2.new(1, -20, 1, -36)
+    body.Position = UDim2.new(0, 10, 0, 34)
+    body.BackgroundTransparency = 1
+    body.Text = "Diagnostics • Performance • Resilience"
+    body.TextColor3 = Color3.fromRGB(180, 220, 255)
+    body.Font = Enum.Font.Gotham
+    body.TextSize = 14
+    body.TextWrapped = true
+    body.Parent = frame
+
+    self.Gui = gui
+end
+
+function StatusUIPlugin:Process(dt)
+    if not self.Gui then return end
+    local frame = self.Gui:FindFirstChild("MainFrame")
+    if not frame then return end
+    local body = frame:FindFirstChild("Body")
+    if not body then return end
+    local fps = 0
+    if dt and dt > 0 then
+        fps = math.max(1, math.floor(1 / dt))
+    end
+    body.Text = string.format("Modules: %d\nFPS: %d\nStatus: Active", #self.Framework.Plugins, fps)
+end
+
+local engine = Framework.new()
+engine:Bootstrap()
+
+if getgenv then
+    getgenv().ApexEngine = engine
+    getgenv().ApexEngineBootstrap = function()
+        return engine:Bootstrap()
+    end
+end
+
+return engine
