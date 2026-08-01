@@ -1,0 +1,20 @@
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+*.bak
+
+# Lua / Roblox local artifacts
+*.log
+*.rbxm
+*.rbxlx
+*.rbxl
+
+# Build and temp folders
+build/
+temp/
+.cache/

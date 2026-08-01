@@ -1,0 +1,9 @@
+{
+  "name": "apexengine",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A modular Lua framework for Roblox-oriented plugin development",
+  "scripts": {
+    "validate": "find src -name '*.lua' -print0 | xargs -0 -n1 lua -e 'assert(loadfile(arg[1]))' _"
+  }
+}
