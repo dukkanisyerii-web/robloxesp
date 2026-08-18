@@ -1,0 +1,53 @@
+name: Yağmur Rush Mirror
+
+on:
+  push:
+    branches: [yagmur-rush-site]
+
+permissions:
+  contents: write
+
+jobs:
+  mirror:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: yagmur-rush-site
+          fetch-depth: 0
+      - name: Check source URL
+        id: source
+        shell: bash
+        run: |
+          if [ ! -s source-url.txt ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+      - name: Download production game
+        if: steps.source.outputs.ready == 'true'
+        shell: bash
+        run: |
+          URL="$(tr -d '\r\n' < source-url.txt)"
+          curl --fail --location --retry 4 --retry-delay 2 "$URL" -o index.html
+          test -s index.html
+          BYTES=$(wc -c < index.html)
+          echo "Downloaded $BYTES bytes"
+          if [ "$BYTES" -lt 5000000 ]; then
+            echo "Downloaded file is unexpectedly small" >&2
+            exit 1
+          fi
+      - name: Commit mirrored game
+        if: steps.source.outputs.ready == 'true'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          if git diff --cached --quiet; then
+            echo "No game changes"
+            exit 0
+          fi
+          git commit -m "[mirror] Update Yağmur Rush production game"
+          git push origin HEAD:yagmur-rush-site
